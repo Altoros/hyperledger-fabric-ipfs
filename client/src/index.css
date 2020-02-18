@@ -1,0 +1,124 @@
+html,
+body {
+    height: 100%;
+    margin: 0
+}
+
+#app, .main-section {
+    display: flex;
+    flex-flow: column;
+    height: 100%;
+}
+
+.content-section {
+    padding: 1rem 1rem;
+    background-color: #e9ecef;
+    border-radius: .3rem;
+}
+
+.main-section .row-custom.header {
+    flex: 0 1 auto;
+}
+
+.main-section .row-custom.content-section {
+    flex: 1 1 auto;
+}
+
+.main-section .row-custom.footer {
+    flex: 0 1 40px;
+}
+
+#app, footer {
+    background-color: #2e2e2e;
+}
+
+.container .text-white {
+    margin: 20px 0;
+}
+
+a {
+    cursor: pointer;
+}
+
+.overlay {
+    position: fixed;
+    width: 100%;
+    height: 100%;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.6);
+    z-index: 50; /* Specify a stack order in case you're using a different order for other elements */
+    cursor: pointer;
+}
+
+/*override rc-switch styles*/
+.rc-switch {
+    width: 80px !important;
+    background-color: rgba(5, 255, 15, 0.5) !important;
+}
+
+.rc-switch-checked:after {
+    left: 60px !important;
+}
+
+.rc-switch-checked {
+    background-color: rgba(250, 5, 15, 0.5) !important;
+}
+
+/* react table */
+.ReactTable .rt-td {
+    padding: 0 0.5rem;
+    /*text-align: end;*/
+}
+
+.ReactTable .rt-tr-group {
+    min-height: 40px;
+}
+
+.container .btn {
+    white-space: normal;
+}
+
+.drop-zone-section {
+    border: dashed;
+    margin: auto;
+}
+
+.input-group.border-danger ~ .invalid-feedback, .drop-zone-section.border-danger ~ .invalid-feedback {
+    display: block;
+}
+
+.main-section .header {
+    margin: 40px 55px;
+    padding: 0;
+    height: 0;
+}
+
+.modal .drop-zone-section {
+    height: 10rem;
+}
+
+.overflow-auto {
+    overflow: auto;
+}
+
+.logo {
+    height: 50px;
+}
+
+@media screen and (max-height: 800px) {
+    .modal .modal-content {
+        max-height: 46rem;
+        overflow: auto;
+    }
+
+    .modal .modal-header {
+        padding-bottom: 2rem;
+    }
+
+    .modal .modal-footer {
+        padding: 2rem;
+    }
+}

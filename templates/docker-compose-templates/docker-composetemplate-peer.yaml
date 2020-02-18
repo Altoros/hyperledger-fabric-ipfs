@@ -1,0 +1,257 @@
+#
+# Copyright Altoros. All Rights Reserved.
+#
+
+version: '2'
+
+volumes:
+  peer0.{{ org }}.{{ domain }}:
+  peer1.{{ org }}.{{ domain }}:
+
+services:
+
+  ca.{{ org }}.{{ domain }}:
+    container_name: ca.{{ org }}.{{ domain }}
+    image: hyperledger/fabric-ca:{{ fabric_pack }}
+#    restart: always
+    environment:
+      - FABRIC_CA_HOME=/etc/hyperledger/fabric-ca-server
+      - FABRIC_CA_SERVER_CA_CERTFILE=/etc/hyperledger/fabric-ca-server-config/ca.{{ org }}.{{ domain }}-cert.pem
+      - FABRIC_CA_SERVER_CA_KEYFILE=/etc/hyperledger/fabric-ca-server-config/CA_PRIVATE_KEY
+      - FABRIC_CA_SERVER_TLS_ENABLED=true
+      - FABRIC_CA_SERVER_TLS_CERTFILE=/etc/hyperledger/fabric-ca-server-config/ca.{{ org }}.{{ domain }}-cert.pem
+      - FABRIC_CA_SERVER_TLS_KEYFILE=/etc/hyperledger/fabric-ca-server-config/CA_PRIVATE_KEY
+#    ports:
+#      - CA_PORT:7054
+    command: sh -c 'fabric-ca-server start -b admin:adminpw -d'
+    volumes:
+      - {{ fabric_artifacts }}/crypto-config/peerOrganizations/{{ org }}.{{ domain }}/ca/:/etc/hyperledger/fabric-ca-server-config
+      - {{ fabric_artifacts }}/fabric-ca-server-config-{{ org }}.yaml:/etc/hyperledger/fabric-ca-server/fabric-ca-server-config.yaml
+
+  peer0.{{ org }}.{{ domain }}:
+    container_name: peer0.{{ org }}.{{ domain }}
+    extends:
+      file: base.yaml
+      service: peer-base
+    environment:
+      - CORE_PEER_ID=peer0.{{ org }}.{{ domain }}
+      - CORE_PEER_LOCALMSPID={{ org }}MSP
+      - CORE_PEER_ADDRESS=peer0.{{ org }}.{{ domain }}:7051
+      - CORE_PEER_GOSSIP_BOOTSTRAP=peer1.{{ org }}.{{ domain }}:7051
+      - CORE_PEER_GOSSIP_EXTERNALENDPOINT=peer0.{{ org }}.{{ domain }}:7051
+    ports:
+      - {{ peer0_port }}:7051
+      - {{ event0_port }}:7053
+    volumes:
+        - {{ fabric_artifacts }}/crypto-config/peerOrganizations/{{ org }}.{{ domain }}/peers/peer0.{{ org }}.{{ domain }}/:/etc/hyperledger/crypto/peer
+        - peer0.{{ org }}.{{ domain }}:/var/hyperledger/production
+    depends_on:
+      - ca.{{ org }}.{{ domain }}
+{% if use_couchdb == 'yes' %}
+      - couchdb.{{ org }}.{{ domain }}
+{% endif %}
+    extra_hosts:
+{% for fabric_host in groups['nodes'] %}
+{% if hostvars[fabric_host].inventory_hostname|string() != inventory_hostname|string() %}
+{% if 'orderer' in hostvars[fabric_host].node_roles %}
+      -  orderer{{ hostvars[fabric_host].orderer_id | default() }}.{{ domain }}:{{ hostvars[fabric_host].ansible_host }}
+{% endif %}
+{% if 'peer' in hostvars[fabric_host].node_roles %}
+      -  peer0.{{ hostvars[fabric_host].org }}.{{ domain }}:{{ hostvars[fabric_host].ansible_host }}
+      -  peer1.{{ hostvars[fabric_host].org }}.{{ domain }}:{{ hostvars[fabric_host].ansible_host }}
+{% endif %}
+{% endif %}
+{% endfor %}
+
+  peer1.{{ org }}.{{ domain }}:
+    container_name: peer1.{{ org }}.{{ domain }}
+    extends:
+      file: base.yaml
+      service: peer-base
+    environment:
+      - CORE_PEER_ID=peer1.{{ org }}.{{ domain }}
+      - CORE_PEER_LOCALMSPID={{ org }}MSP
+      - CORE_PEER_ADDRESS=peer1.{{ org }}.{{ domain }}:7051
+      - CORE_PEER_GOSSIP_BOOTSTRAP=peer0.{{ org }}.{{ domain }}:7051
+      - CORE_PEER_GOSSIP_EXTERNALENDPOINT=peer1.{{ org }}.{{ domain }}:7051
+    ports:
+      - {{ peer1_port }}:7051
+      - {{ event1_port }}:7053
+    volumes:
+        - {{ fabric_artifacts }}/crypto-config/peerOrganizations/{{ org }}.{{ domain }}/peers/peer1.{{ org }}.{{ domain }}/:/etc/hyperledger/crypto/peer
+        - peer1.{{ org }}.{{ domain }}:/var/hyperledger/production
+    depends_on:
+      - ca.{{ org }}.{{ domain }}
+{% if use_couchdb == 'yes' %}
+      - couchdb.{{ org }}.{{ domain }}
+{% endif %}
+    extra_hosts:
+{% for fabric_host in groups['nodes'] %}
+{% if hostvars[fabric_host].inventory_hostname|string() != inventory_hostname|string() %}
+{% if 'orderer' in hostvars[fabric_host].node_roles %}
+      -  orderer{{ hostvars[fabric_host].orderer_id | default() }}.{{ domain }}:{{ hostvars[fabric_host].ansible_host }}
+{% endif %}
+{% if 'peer' in hostvars[fabric_host].node_roles %}
+      -  peer0.{{ hostvars[fabric_host].org }}.{{ domain }}:{{ hostvars[fabric_host].ansible_host }}
+      -  peer1.{{ hostvars[fabric_host].org }}.{{ domain }}:{{ hostvars[fabric_host].ansible_host }}
+{% endif %}
+{% endif %}
+{% endfor %}
+
+  # fabric-rest api server
+  api.{{ org }}.{{ domain }}:
+    extends:
+      file: base.yaml
+      service: api-base
+    container_name: api.{{ org }}.{{ domain }}
+    ports:
+      - {{ api_port }}:4000
+    environment:
+      - ORG={{ org }}
+      - PORT=4000
+    depends_on:
+      - peer0.{{ org }}.{{ domain }}
+      - peer1.{{ org }}.{{ domain }}
+    extra_hosts:
+{% for fabric_host in groups['nodes'] %}
+{% if hostvars[fabric_host].inventory_hostname|string() != inventory_hostname|string() %}
+{% if 'orderer' in hostvars[fabric_host].node_roles %}
+      -  orderer{{ hostvars[fabric_host].orderer_id | default() }}.{{ domain }}:{{ hostvars[fabric_host].ansible_host }}
+{% endif %}
+{% if 'peer' in hostvars[fabric_host].node_roles %}
+      -  peer0.{{ hostvars[fabric_host].org }}.{{ domain }}:{{ hostvars[fabric_host].ansible_host }}
+      -  peer1.{{ hostvars[fabric_host].org }}.{{ domain }}:{{ hostvars[fabric_host].ansible_host }}
+{% endif %}
+{% endif %}
+{% endfor %}
+
+  cli.{{ domain }}:
+    container_name: cli.{{ domain }}
+    extends:
+      file: base.yaml
+      service: cli-base
+{% if 'root_orderer' in node_roles%}
+    environment:
+      - CORE_PEER_LOCALMSPID=OrdererMSP
+    volumes:
+        - {{ fabric_artifacts }}/crypto-config/ordererOrganizations/{{ domain }}/users/Admin@{{ domain }}:/etc/hyperledger/crypto/peer
+        - {{ fabric_artifacts }}/crypto-config/ordererOrganizations/{{ domain }}/orderers/orderer{{ orderer_id | default() }}.{{ domain }}/tls:/etc/hyperledger/crypto/orderer/tls
+{% else %}
+    volumes:
+      - {{ fabric_artifacts }}/crypto-config/ordererOrganizations/{{ domain }}/orderers/orderer{{ orderer_id | default() }}.{{ domain }}/tls:/etc/hyperledger/crypto/orderer/tls
+{% endif %}
+
+  cli.{{ org }}.{{ domain }}:
+    container_name: cli.{{ org }}.{{ domain }}
+    extends:
+      service: cli.{{ domain }}
+    environment:
+      - CORE_PEER_LOCALMSPID={{ org }}MSP
+      - CC_ENDORSEMENT_COMMON={{ chaincode_endorcement_policy_common }}
+      - CC_ENDORSEMENT_BILATERAL={{ chaincode_endorcement_policy_bilateral }}
+    volumes:
+        - {{ fabric_artifacts }}/crypto-config/peerOrganizations/{{ org }}.{{ domain }}/users/Admin@{{ org }}.{{ domain }}:/etc/hyperledger/crypto/peer
+    extra_hosts:
+{% for fabric_host in groups['nodes'] %}
+{% if 'orderer' in hostvars[fabric_host].node_roles %}
+      -  orderer{{ hostvars[fabric_host].orderer_id | default() }}.{{ domain }}:{{ hostvars[fabric_host].ansible_host }}
+{% endif %}
+{% endfor %}
+
+  cliNoCryptoVolume.{{ org }}.{{ domain }}:
+    container_name: cliNoCryptoVolume.{{ org }}.{{ domain }}
+    extends:
+      file: base.yaml
+      service: cli-base
+    environment:
+      - CORE_PEER_LOCALMSPID={{ org }}MSP
+    extra_hosts:
+{% for fabric_host in groups['nodes'] %}
+{% if 'orderer' in hostvars[fabric_host].node_roles %}
+      -  orderer{{ hostvars[fabric_host].orderer_id | default() }}.{{ domain }}:{{ hostvars[fabric_host].ansible_host }}
+{% endif %}
+{% endfor %}
+
+{% if use_couchdb == 'yes' %}
+  couchdb.{{ org }}.{{ domain }}:
+    container_name: couchdb.{{ org }}.{{ domain }}
+    image: hyperledger/fabric-couchdb:{{ fabric_thirdparty_version }}
+    restart: {{ docker_restart_policy }}
+    # Populate the COUCHDB_USER and COUCHDB_PASSWORD to set an admin user and password
+    # for CouchDB.  This will prevent CouchDB from operating in an "Admin Party" mode.
+#    environment:
+#      - COUCHDB_USER=
+#      - COUCHDB_PASSWORD=
+    # Comment/Uncomment the port mapping if you want to hide/expose the CouchDB service,
+    # for example map it to utilize Fauxton User Interface in dev environments.
+    ports:
+      - {{ couchdb_port }}:5984
+{% endif %}
+
+  ipfs.{{ org }}.{{ domain }}:
+    container_name: ipfs.{{ org }}.{{ domain }}
+    restart: {{ docker_restart_policy }}
+    image: ipfs/go-ipfs:{{ ipfs_version }}
+    environment:
+      LIBP2P_FORCE_PNET: 1
+    ports:
+      - "{{ ipfs_swarm_port }}:4001" # ipfs swarm
+      - "{{ ipfs_api_port }}:5001" # expose if needed/wanted
+    volumes:
+      - {{ ipfs_workdir }}/ipfs.{{ org }}.{{ domain }}:/data/ipfs
+    extra_hosts:
+{% for fabric_host in groups['nodes'] %}
+{% if 'peer' in hostvars[fabric_host].node_roles %}
+      - ipfs.{{ hostvars[fabric_host].org }}.{{ domain }}:{{ hostvars[fabric_host].ansible_host }}
+{% endif %}
+{% endfor %}
+
+
+#
+# IPFS-cluster containers is disabled, for security-reasons.
+# In case of need in ipfs-cluster containers, they must be
+# behind proxy server with ssl-authorisation.
+# see - https://cluster.ipfs.io/documentation/security/
+#
+#  ipfs-cluster.{{ org }}.{{ domain }}:
+#    container_name: ipfs-cluster.{{ org }}.{{ domain }}
+#    restart: {{ docker_restart_policy }}
+#    image: ipfs/ipfs-cluster:{{ ipfs_cluster_version }}
+#    depends_on:
+#      - ipfs.{{ org }}.{{ domain }}
+#    environment:
+#      CLUSTER_SECRET: {{ ipfs_secret }}
+#      IPFS_API: /dns4/ipfs.{{ org }}.{{ domain }}/tcp/5001
+#    ports:
+#      - "{{ ipfs_cluster_port }}:9094" # API
+#      - "{{ ipfs_proxy_port }}:9096" # Proxy
+#    volumes:
+#      - {{ ipfs_workdir }}/ipfs-cluster.{{ org }}.{{ domain }}:/data/ipfs-cluster
+#{% if 'root_peer' not in node_roles %}
+#    entrypoint:
+#      - "/sbin/tini"
+#      - "--"
+#{% for fabric_host in groups['nodes'] %}
+#{% if 'root_peer' in hostvars[fabric_host].node_roles %}
+#    command: >-
+#      sh -c '
+#        cmd="daemon --upgrade"
+#        if [ ! -d /data/ipfs-cluster/raft ]; then
+#          while ! ipfs-cluster-ctl --host /dns4/ipfs-cluster.{{ hostvars[fabric_host].org }}.{{ domain }}/tcp/{{ ipfs_cluster_port }} id; do
+#            sleep 1
+#          done
+#          pid=`ipfs-cluster-ctl --host /dns4/ipfs-cluster.{{ hostvars[fabric_host].org }}.{{ domain }}/tcp/{{ ipfs_cluster_port }} id | grep -o -E "^(\w+)"`
+#          sleep 10
+#          cmd="daemon --bootstrap /dns4/ipfs-cluster.{{ hostvars[fabric_host].org }}.{{ domain }}/tcp/{{ ipfs_proxy_port }}/ipfs/$$pid"
+#        fi
+#        exec /usr/local/bin/entrypoint.sh $$cmd
+#      '
+#{% endif %}
+#{% endfor %}
+#{% endif %}
+#    extra_hosts:
+#{% for fabric_host in groups['nodes'] %}
+#{% if 'peer' in hostvars[fabric_host].node_roles %}
+#      - ipfs-cluster.{{ hostvars[fabric_host].org }}.{{ domain }}:{{ hostvars[fabric_host].ansible_host }}
+#{% endif %}
+#{% endfor %}

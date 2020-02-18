@@ -1,0 +1,31 @@
+{
+	"network-config": {
+		"orderer": {
+			"url": "grpcs://orderer{{ orderer_id | default() }}.{{ domain }}:{{ orderer_port }}",
+			"server-hostname": "orderer{{ orderer_id | default() }}.{{ domain }}",
+			"tls_cacerts": "crypto-config/ordererOrganizations/{{ domain }}/orderers/orderer{{ orderer_id | default() }}.{{ domain }}/tls/ca.crt"
+		}{% for fabric_host in groups['nodes'] %}{% if 'peer' in hostvars[fabric_host].node_roles %},
+		"{{ hostvars[fabric_host].org }}": {
+			"name": "peer{{ hostvars[fabric_host].org }}",
+			"ip_address": "{{ hostvars[fabric_host].ansible_host }}",
+			"mspid": "{{ hostvars[fabric_host].org }}MSP",
+			"ca": "https://ca.{{ hostvars[fabric_host].org }}.{{ domain }}:{{ ca_port }}",
+			"peer0": {
+				"requests": "grpcs://peer0.{{ hostvars[fabric_host].org }}.{{ domain }}:{{ peer0_port }}",
+				"events": "grpcs://peer0.{{ hostvars[fabric_host].org }}.{{ domain }}:{{ event0_port }}",
+				"server-hostname": "peer0.{{ hostvars[fabric_host].org }}.{{ domain }}",
+				"tls_cacerts": "crypto-config/peerOrganizations/{{ hostvars[fabric_host].org }}.{{ domain }}/peers/peer0.{{ hostvars[fabric_host].org }}.{{ domain }}/tls/ca.crt"
+			},
+			"peer1": {
+				"requests": "grpcs://peer1.{{ hostvars[fabric_host].org }}.{{ domain }}:{{ peer1_port }}",
+				"events": "grpcs://peer1.{{ hostvars[fabric_host].org }}.{{ domain }}:{{ event1_port }}",
+				"server-hostname": "peer1.{{ hostvars[fabric_host].org }}.{{ domain }}",
+				"tls_cacerts": "crypto-config/peerOrganizations/{{ hostvars[fabric_host].org }}.{{ domain }}/peers/peer1.{{ hostvars[fabric_host].org }}.{{ domain }}/tls/ca.crt"
+			},
+			"admin": {
+				"key": "crypto-config/peerOrganizations/{{ hostvars[fabric_host].org }}.{{ domain }}/users/Admin@{{ hostvars[fabric_host].org }}.{{ domain }}/msp/keystore",
+				"cert": "crypto-config/peerOrganizations/{{ hostvars[fabric_host].org }}.{{ domain }}/users/Admin@{{ hostvars[fabric_host].org }}.{{ domain }}/msp/signcerts"
+			}
+		}{% endif %}{% endfor %}
+	}
+}

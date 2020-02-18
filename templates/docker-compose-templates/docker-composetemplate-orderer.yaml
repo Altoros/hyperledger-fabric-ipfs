@@ -1,0 +1,43 @@
+#
+# Copyright Altoros. All Rights Reserved.
+#
+
+version: '2'
+
+volumes:
+  orderer{{ orderer_id | default() }}.{{ domain }}:
+
+services:
+
+  orderer{{ orderer_id | default() }}.{{ domain }}:
+    container_name: orderer{{ orderer_id | default() }}.{{ domain }}
+    restart: {{ docker_restart_policy }}
+    image: hyperledger/fabric-orderer:{{ fabric_pack }}
+    environment:
+      - ORDERER_HOST=orderer{{ orderer_id | default() }}.{{ domain }}
+      - ORDERER_GENERAL_LOGLEVEL=info
+      - ORDERER_GENERAL_LISTENADDRESS=0.0.0.0
+      - ORDERER_GENERAL_GENESISMETHOD=file
+      - ORDERER_GENERAL_GENESISFILE=/etc/hyperledger/configtx/genesis.block
+      - ORDERER_GENERAL_LOCALMSPID=OrdererMSP
+      - ORDERER_GENERAL_LOCALMSPDIR=/etc/hyperledger/crypto/orderer/msp
+      - ORDERER_GENERAL_TLS_ENABLED=true
+      - ORDERER_GENERAL_TLS_PRIVATEKEY=/etc/hyperledger/crypto/orderer/tls/server.key
+      - ORDERER_GENERAL_TLS_CERTIFICATE=/etc/hyperledger/crypto/orderer/tls/server.crt
+      - ORDERER_GENERAL_TLS_ROOTCAS=[/etc/hyperledger/crypto/orderer/tls/ca.crt]
+    working_dir: /etc/hyperledger
+    command: orderer
+    ports:
+      - {{ orderer_port }}:7050
+    volumes:
+        - {{ fabric_artifacts }}/channel:/etc/hyperledger/configtx
+        - {{ fabric_artifacts }}/crypto-config/ordererOrganizations/{{ domain }}/orderers/orderer{{ orderer_id | default() }}.{{ domain }}/:/etc/hyperledger/crypto/orderer
+        - orderer{{ orderer_id | default() }}.{{ domain }}:/var/hyperledger/production/orderer
+
+  cli.{{ domain }}:
+    container_name: cli.{{ domain }}
+    environment:
+      - FABRIC_CFG_PATH=/etc/hyperledger/artifacts
+    extends:
+      file: base.yaml
+      service: cli-base

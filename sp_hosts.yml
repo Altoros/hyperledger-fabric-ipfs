@@ -1,0 +1,36 @@
+---
+all:
+  hosts:
+    localhost: # localhost connection parameters, used for storing configuration while transferring it between nodes
+      ansible_connection: local
+  vars:
+    domain: example.com
+    kafka_orderer: false
+  children:
+    nodes:
+      hosts:
+        mainorg.example.com: # Describes which containers will run on this node
+          node_roles:
+            - root_orderer # This node will be used to generate crypto-config for other orderers
+            - orderer # This node will host an orderer-service
+            - peer # This node will host peers and api containers for organization
+            - root_peer # This node will be used to create channels and instantiate chaincode
+          org: mainorg # Organization name
+          ansible_host: 192.168.77.17 # Real ip address or domain name of the machine
+          ansible_user: ubuntu  # User with sudo access
+          ansible_ssh_port: 22 # Specify ssh-port here, if case of it's not defaulted.
+        # Same structure for any other nodes
+        clienta.example.com:
+          node_roles:
+            - peer # This node will host peers and api containers for organization
+          org: clienta
+          ansible_host: 192.168.77.12
+          ansible_user: ubuntu
+          ansible_ssh_port: 22
+        clientb.example.com:
+          node_roles:
+            - peer
+          org: clientb
+          ansible_host: 192.168.77.18
+          ansible_user: ubuntu
+          ansible_ssh_port: 22

@@ -1,0 +1,127 @@
+---
+# Specify users which will be able to access docker without root privileges
+docker_users:
+  - "{{ ansible_user }}"
+
+# Restart policy for Docker containers
+docker_restart_policy: "always"
+
+project_name: "fabric-ipfs"
+
+fabric_starter_workdir: "/home/{{ ansible_user }}/{{ project_name }}"
+docker_artifacts: "{{ fabric_starter_workdir }}/dockercompose"
+fabric_artifacts: "{{ fabric_starter_workdir }}/artifacts"
+
+# Use couchdb in peers instead of leveldb
+#use_couchdb: 'yes'
+use_couchdb: 'no'
+couchdb_port: 5984
+
+# Hyperledger framework version
+fabric_version: "1.4.0"
+fabric_pack: "amd64-{{ fabric_version }}"
+# fabric_thirdparty_version needed for couchdb, kafka etc..
+fabric_thirdparty_version: "latest"
+fabric_rest_version: "latest"
+node_version: "8-alpine"
+
+# IPFS Settings
+ipfs_version: "v0.4.18"
+ipfs_cluster_version: "v0.7.0"
+ipfs_secret: "{{ lookup('password', 'secrets/ipfs_secret chars=hexdigits length=64') }}"
+ipfs_swarm_secret: "{{ lookup('password', 'secrets/ipfs_swarm_secret chars=hexdigits length=64') }}"
+ipfs_cluster_port: 9094
+ipfs_swarm_port: 4001
+ipfs_api_port: 5001
+ipfs_proxy_port: 9096
+ipfs_workdir: "{{ fabric_starter_workdir }}"
+ipfs_api_origin_config: '["*"]'
+ipfs_api_headers_config: '["PUT","GET","POST"]'
+
+# Default HL fabric ports
+
+zookeper_ports:
+  - '2181'
+  - '2888'
+  - '3888'
+kafka_broker_port: 9092
+
+orderer_port: 7050
+
+api_port: 4000
+ca_port: 7054
+peer0_port: 7051
+event0_port: 7053
+peer1_port: 7056
+event1_port: 7058
+
+#Chaincode configs
+chaincode: "{{ fabric_starter_workdir }}/chaincode"
+chaincode_lang: "golang"
+chaincode_version: "310.0"
+chaincode_common_name: "reference"
+chaincode_bilateral_name: "relationship"
+
+chaincode_endorcement_policy_common: "OR({% for fabric_host in groups['nodes'] %}{% if ('peer' in hostvars[fabric_host].node_roles) %}{% raw %}'{% endraw %}{{ hostvars[fabric_host].org }}{% raw %}MSP.member'{% endraw %}{% if not loop.last %},{% endif %}{% endif %}{% endfor %})"
+chaincode_endorcement_policy_bilateral: "AND({% for fabric_host in groups['nodes'] %}{% if 'root_peer' in hostvars[fabric_host].node_roles %}{% raw %}'{% endraw %}{{ hostvars[fabric_host].org }}{% raw %}MSP.member'{% endraw %}{% endif %}{% endfor %})"
+
+node_command: "npm install rethinkdbdash -y && npm install nodemailer -y && npm install node-cron -y && npm start"
+
+chanicode_common_init: '{"Args":["init",""]}'
+chanicode_bilateral_init: '{"Args":["init", ""]}'
+
+# Folders to create for configs
+fabric_artifacts_folders:
+  - "{{ fabric_starter_workdir }}"
+  - "{{ docker_artifacts }}"
+  - "{{ fabric_artifacts }}"
+  - "{{ fabric_artifacts }}/channel"
+  - "{{ chaincode }}"
+  - "{{ fabric_starter_workdir }}/www-client"
+
+# Configuration files to transfer list
+# - source
+#   destination
+
+fabric_templates:
+  - from: "docker-compose-templates/base.yaml"
+    to: "{{ docker_artifacts }}/base.yaml"
+  - from: "artifact-templates/configtxtemplate.yaml"
+    to: "{{ fabric_artifacts }}/configtx.yaml"
+  - from: "artifact-templates/network-config-template.json"
+    to: "{{ fabric_artifacts }}/network-config.json"
+
+peer_templates:
+  - from: "artifact-templates/fabric-ca-server-configtemplate.yaml"
+    to: "{{ fabric_artifacts }}/fabric-ca-server-{{ org }}.yaml"
+  - from: "docker-compose-templates/docker-composetemplate-peer.yaml"
+    to: "{{ docker_artifacts }}/docker-compose-{{ org }}.yaml"
+  - from: "artifact-templates/cryptogentemplate-peer.yaml"
+    to: "{{ fabric_artifacts }}/cryptogen-{{ org }}.yaml"
+
+orderer_templates:
+  - from: "docker-compose-templates/docker-composetemplate-orderer.yaml"
+    to: "{{ docker_artifacts }}/docker-compose-{{ domain }}.yaml"
+  - from: "artifact-templates/cryptogentemplate-orderer.yaml"
+    to: "{{ fabric_artifacts }}/cryptogen-{{ domain }}.yaml"
+
+files_to_rsync_orderer:
+  - from: "*.json"
+    to: ""
+  - from: "crypto-config/peerOrganizations/{{ org }}.{{ domain }}/msp"
+    to: "crypto-config/peerOrganizations/{{ org }}.{{ domain }}"
+  - from: "crypto-config/peerOrganizations/{{ org }}.{{ domain }}/peers/peer0.{{ org }}.{{ domain }}/tls/ca.crt"
+    to: "crypto-config/peerOrganizations/{{ org }}.{{ domain }}/peers/peer0.{{ org }}.{{ domain }}/tls"
+  - from: "crypto-config/peerOrganizations/{{ org }}.{{ domain }}/peers/peer1.{{ org }}.{{ domain }}/tls/ca.crt"
+    to: "crypto-config/peerOrganizations/{{ org }}.{{ domain }}/peers/peer1.{{ org }}.{{ domain }}/tls"
+
+files_to_rsync_nodes_phase1:
+  - from: "crypto-config/ordererOrganizations/{{ domain }}/orderers"
+    to: "crypto-config/ordererOrganizations/{{ domain }}/"
+  - from: "channel"
+    to: ""
+files_to_rsync_nodes_phase2:
+  - from: "network-config.json"
+    to: ""
+  - from: "*.block"
+    to: ""

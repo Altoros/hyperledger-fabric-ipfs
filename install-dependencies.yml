@@ -1,0 +1,8 @@
+---
+- name: Assume all dependencies are installed.
+  hosts: nodes
+  become: true
+  roles:
+    - common-packages
+    - docker
+    - fabric

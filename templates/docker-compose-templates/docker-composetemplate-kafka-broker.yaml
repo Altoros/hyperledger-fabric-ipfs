@@ -1,0 +1,28 @@
+version: '2'
+
+services:
+
+  kafka-broker.{{ inventory_hostname }}:
+    container_name: kafka-broker.{{ inventory_hostname }}
+    extends:
+      file: base.yaml
+      service: kafka-base
+    environment:
+      - KAFKA_BROKER_ID={{ kafka_broker_id }}
+      - KAFKA_ADVERTISED_HOST_NAME={{ ansible_host }}
+      - KAFKA_ADVERTISED_PORT={{ kafka_broker_port }}
+      - KAFKA_MIN_INSYNC_REPLICAS={{ kafka_replicas }}
+      - KAFKA_DEFAULT_REPLICATION_FACTOR={{ kafka_replication_factor }}
+      - KAFKA_LOG_RETENTION_MS=-1
+      - KAFKA_ZOOKEEPER_CONNECT={% for fabric_host in groups['nodes'] %}{% if 'zookeeper' in hostvars[fabric_host].node_roles %}zookeeper.{{ hostvars[fabric_host].inventory_hostname }}:{{ zookeper_ports[0] }}{% if not loop.last %},{% endif %}{% endif %}{% endfor %}
+
+    ports:
+      - {{ kafka_broker_port }}:9092
+    extra_hosts:
+{% for fabric_host in groups['nodes'] %}
+{% if 'zookeeper' in hostvars[fabric_host].node_roles %}
+{% if hostvars[fabric_host].inventory_hostname|string() != inventory_hostname|string() %}
+      - zookeeper.{{ hostvars[fabric_host].inventory_hostname }}:{{ hostvars[fabric_host].ansible_host }}
+{% endif %}
+{% endif %}
+{% endfor %}

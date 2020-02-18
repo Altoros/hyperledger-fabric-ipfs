@@ -1,0 +1,21 @@
+---
+- name: Clean all previous dockers, if any
+  raw: "docker rm -f $(docker ps -a | grep {{ domain }} | awk '{print $1};')"
+  ignore_errors: true
+
+- name: Clean all docker volumes, if any
+  raw: "docker volume rm $(docker volume ls -qf dangling=true)"
+  ignore_errors: true
+
+- name: Pull all docker images.
+  docker_image:
+    name: "{{ item.image }}:{{ item.version }}"
+    state: present
+  loop: "{{ fabric_docker_images }}"
+
+- name: Pull kafka images
+  docker_image:
+    name: "{{ item.image }}:{{ item.version }}"
+    state: present
+  loop: "{{ kafka_docker_images }}"
+  when: kafka_orderer
